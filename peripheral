@@ -1,0 +1,38 @@
+import asyncio
+from bleak import BleakScanner, BleakServer
+from bleak.backends.service import BleakGATTService
+from bleak.backends.characteristic import BleakGATTCharacteristic
+
+SERVICE_UUID = "fff0"
+CHARACTERISTIC_UUID = "fff1"
+
+class BLEService:
+    def __init__(self):
+        self.server = BleakServer()
+        self.service = BleakGATTService(SERVICE_UUID)
+        self.characteristic = BleakGATTCharacteristic(CHARACTERISTIC_UUID, ["read", "write"])
+        self.characteristic.value = bytearray([1])  # Equivalent to setting transferData.writeValue(true)
+
+        self.service.add_characteristic(self.characteristic)
+        self.server.add_service(self.service)
+
+    async def start(self):
+        await self.server.start_advertising()
+        print(" ------- Started to Broadcast Signal ------- ")
+
+    async def loop(self):
+        while True:
+            central = await self.server.wait_for_connection()
+            print("Connected to:", central)
+            while await self.server.is_connected(central):
+                value = await self.server.read_gatt_char(self.characteristic)
+                print(value)
+                await asyncio.sleep(1)
+
+async def main():
+    ble_service = BLEService()
+    await ble_service.start()
+    await ble_service.loop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
