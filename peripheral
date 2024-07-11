@@ -1,38 +1,35 @@
-import asyncio
-from bleak import BleakScanner, BleakServer
-from bleak.backends.service import BleakGATTService
-from bleak.backends.characteristic import BleakGATTCharacteristic
+from bluezero import peripheral
 
-SERVICE_UUID = "fff0"
-CHARACTERISTIC_UUID = "fff1"
+# Define a callback function for read and write operations
+def read_callback():
+    return [0x01]
 
-class BLEService:
-    def __init__(self):
-        self.server = BleakServer()
-        self.service = BleakGATTService(SERVICE_UUID)
-        self.characteristic = BleakGATTCharacteristic(CHARACTERISTIC_UUID, ["read", "write"])
-        self.characteristic.value = bytearray([1])  # Equivalent to setting transferData.writeValue(true)
+def write_callback(value):
+    print(f'New value written: {value}')
 
-        self.service.add_characteristic(self.characteristic)
-        self.server.add_service(self.service)
+# Define the BLE Service and Characteristic
+my_service = peripheral.Service('12345678-1234-5678-1234-56789abcdef0', True)
+my_characteristic = peripheral.Characteristic('abcdef01-1234-5678-1234-56789abcdef0',
+                                              ['read', 'write'],
+                                              read_callback,
+                                              write_callback)
 
-    async def start(self):
-        await self.server.start_advertising()
-        print(" ------- Started to Broadcast Signal ------- ")
+# Add the characteristic to the service
+my_service.add_characteristic(my_characteristic)
 
-    async def loop(self):
-        while True:
-            central = await self.server.wait_for_connection()
-            print("Connected to:", central)
-            while await self.server.is_connected(central):
-                value = await self.server.read_gatt_char(self.characteristic)
-                print(value)
-                await asyncio.sleep(1)
+# Define the BLE Peripheral
+my_peripheral = peripheral.Peripheral(adapter_name='hci0',
+                                      local_name='MyPeripheral',
+                                      services=[my_service])
 
-async def main():
-    ble_service = BLEService()
-    await ble_service.start()
-    await ble_service.loop()
+# Start the peripheral
+my_peripheral.publish()
 
-if __name__ == "__main__":
-    asyncio.run(main())
+print('Advertising... Press Ctrl+C to stop.')
+
+# Run until interrupted
+try:
+    my_peripheral.run()
+except KeyboardInterrupt:
+    print('Stopping advertisement...')
+    my_peripheral.stop()
